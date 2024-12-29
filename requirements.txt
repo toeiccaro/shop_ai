@@ -1,0 +1,4 @@
+fastapi
+opencv-python-headless
+imgbeddings
+psycopg2-binary

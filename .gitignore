@@ -1,0 +1,30 @@
+# Bỏ qua thư mục môi trường ảo
+shop_env_01/
+venv/
+env/
+
+# Bỏ qua các file biên dịch byte-code của Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Bỏ qua file tạm, build artifacts
+build/
+dist/
+*.egg-info/
+
+# Bỏ qua file tạm của hệ điều hành
+.DS_Store
+Thumbs.db
+
+# (Tuỳ chọn) Bỏ qua file cấu hình riêng, môi trường
+.env
+
+# (Tuỳ chọn) Nếu bạn không muốn đưa ảnh lên Git,
+# thêm các dòng sau. Ngược lại, nếu cần lưu ảnh, hãy xoá chúng:
+# *.png
+# *.jpeg
+# *.jpg
+
+# (Tuỳ chọn) Nếu bạn không muốn commit thư mục stored-faces:
+# stored-faces/

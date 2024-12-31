@@ -6,7 +6,7 @@ import cv2
 haar_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
 
 # read the test image as grayscale
-gray_img = cv2.imread("test-image.png", cv2.IMREAD_GRAYSCALE)
+gray_img = cv2.imread("solo2.png", cv2.IMREAD_GRAYSCALE)
 
 # find the faces in that image
 # this gives back an array of the x,y location of each face, and its width and height
@@ -15,7 +15,7 @@ faces = haar_cascade.detectMultiScale(
 )
 
 # make sure the directory we're going to write to actually exists
-os.makedirs('stored-faces', exist_ok=True)
+os.makedirs('stored-faces2', exist_ok=True)
 
 i = 0
 # write all the faces out to files
@@ -24,7 +24,7 @@ for x, y, w, h in faces:
     # crop the image to select only the face
     cropped_image = gray_img[y : y + h, x : x + w]
     # make up a filename for that face - we're just going to number them
-    target_file_name = f'stored-faces/{i}.jpg'
+    target_file_name = f'stored-faces2/{i}.jpg'
     # report each file so we can tell we're doing something
     print(target_file_name)
     # and write the cropped face to the file

@@ -7,11 +7,11 @@ import psycopg2
 # Kết nối tới cơ sở dữ liệu PostgreSQL
 try:
     conn = psycopg2.connect(
-        host="localhost",
+        host="db.logologee.com",
         port=5432,          # Nếu PostgreSQL chạy trên cổng mặc định
         database="shop",
         user="postgres",
-        password="postgres"
+        password="logologi"
     )
     print("Kết nối thành công tới PostgreSQL")
 except Exception as e:

@@ -1,17 +1,29 @@
 import os
 import psycopg2
+import detect.face_recognition_main as face_recognition_main
 from PIL import Image
-from imgbeddings import imgbeddings
 
-from deepface import DeepFace
-
+# 1. Kiểm tra khuôn mặt trong ảnh và tính embedding
+new_img_path = "solo4.png"
 try:
-    analysis = DeepFace.analyze(img_path="solo4.png", actions=["gender"])
-    print("Đây là ảnh khuôn mặt người:", analysis)
-except ValueError:
-    print("Không phát hiện khuôn mặt trong ảnh. Dừng xử lý.")
+    # Load ảnh và phát hiện khuôn mặt
+    image = face_recognition_main.load_image_file(new_img_path)
+    face_locations = face_recognition_main.face_locations(image)
 
-# 1. Kết nối tới PostgreSQL
+    if len(face_locations) == 0:
+        print("Không phát hiện khuôn mặt trong ảnh. Dừng xử lý.")
+        exit(1)
+
+    # Tính embedding cho khuôn mặt
+    encodings = face_recognition_main.face_encodings(image, face_locations)
+    new_embedding = encodings[0]  # Lấy khuôn mặt đầu tiên (nếu có nhiều khuôn mặt)
+    print(f"Đã tính embedding cho ảnh: {new_img_path}")
+
+except Exception as e:
+    print(f"Lỗi khi xử lý ảnh {new_img_path}: {e}")
+    exit(1)
+
+# 2. Kết nối tới PostgreSQL
 try:
     conn = psycopg2.connect(
         host="db.logologee.com",
@@ -25,39 +37,31 @@ except Exception as e:
     print(f"Lỗi khi kết nối tới cơ sở dữ liệu: {e}")
     exit(1)
 
-# 2. Khởi tạo imgbeddings
-ibed = imgbeddings()
-
-# 3. Tính embedding cho ảnh mới
-new_img_path = "solo4.png"
-try:
-    new_img = Image.open(new_img_path)
-    new_embedding = ibed.to_embeddings(new_img)[0]
-    print(f"Đã tính embedding cho ảnh: {new_img_path}")
-except Exception as e:
-    print(f"Lỗi khi xử lý ảnh {new_img_path}: {e}")
-    conn.close()
-    exit(1)
-
-# 4. Truy vấn ảnh tương tự và kèm khoảng cách
+# 3. Truy vấn ảnh tương tự và kèm khoảng cách
 cur = conn.cursor()
 
 # Chuyển embedding sang dạng chuỗi [x1,x2,...]
-embedding_str = "[" + ",".join(str(x) for x in new_embedding.tolist()) + "]"
+embedding_str = "[" + ",".join(str(x) for x in new_embedding) + "]"
 
 # Lấy thêm cột 'distance' = (embedding <-> %s)
 query = """
     SELECT picture,
-           embedding <=> %s AS distance
+           embedding <-> %s AS distance
     FROM pictures
     ORDER BY distance
     LIMIT 1;
 """
-cur.execute(query, (embedding_str,))
-rows = cur.fetchall()
+try:
+    cur.execute(query, (embedding_str,))
+    rows = cur.fetchall()
+except Exception as e:
+    print(f"Lỗi khi truy vấn cơ sở dữ liệu: {e}")
+    cur.close()
+    conn.close()
+    exit(1)
 
-# 5. Đặt ngưỡng (threshold) để quyết định "không tồn tại"
-dist_threshold = 1.0  # Giá trị ví dụ, cần thử & điều chỉnh
+# 4. Đặt ngưỡng (threshold) để quyết định "không tồn tại"
+dist_threshold = 0.6  # Tham số tùy chỉnh, cần thử & điều chỉnh
 
 if rows:
     similar_filename = rows[0][0]

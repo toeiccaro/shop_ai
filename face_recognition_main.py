@@ -1,35 +1,48 @@
 import os
-# import the OpenCV library - it's called cv2
 import cv2
+import time
+from retinaface import RetinaFace
 
-# load the Haar Cascade algorithm from the XML file into OpenCV
-haar_cascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+# Đường dẫn đến ảnh cần xử lý
+input_image_path = "image_goc_2.png"
 
-# read the test image as grayscale
-gray_img = cv2.imread("solo2.png", cv2.IMREAD_GRAYSCALE)
+# Đọc ảnh
+image = cv2.imread(input_image_path)
+if image is None:
+    print(f"Không thể đọc ảnh từ đường dẫn: {input_image_path}")
+    exit(1)
 
-# find the faces in that image
-# this gives back an array of the x,y location of each face, and its width and height
-faces = haar_cascade.detectMultiScale(
-    gray_img, scaleFactor=1.05, minNeighbors=2, minSize=(100, 100)
-)
+# Phát hiện khuôn mặt bằng RetinaFace
+faces = RetinaFace.detect_faces(input_image_path)
 
-# make sure the directory we're going to write to actually exists
-os.makedirs('stored-faces2', exist_ok=True)
+# Đảm bảo thư mục lưu khuôn mặt đã tồn tại
+output_folder = 'stored-faces'
+os.makedirs(output_folder, exist_ok=True)
 
-i = 0
-# write all the faces out to files
-# for each face we found:
-for x, y, w, h in faces:
-    # crop the image to select only the face
-    cropped_image = gray_img[y : y + h, x : x + w]
-    # make up a filename for that face - we're just going to number them
-    target_file_name = f'stored-faces2/{i}.jpg'
-    # report each file so we can tell we're doing something
-    print(target_file_name)
-    # and write the cropped face to the file
-    cv2.imwrite(
-        target_file_name,
-        cropped_image,
-    )
-    i = i + 1
+# Xử lý từng khuôn mặt được phát hiện
+counter = 0  # Counter để tạo tên file duy nhất
+for key, face in faces.items():
+    try:
+        # Lấy tọa độ bounding box của khuôn mặt
+        facial_area = face['facial_area']  # [x1, y1, x2, y2]
+        x1, y1, x2, y2 = facial_area
+
+        # Crop khuôn mặt từ ảnh gốc
+        cropped_face = image[y1:y2, x1:x2]
+
+        # Tạo tên file duy nhất bằng timestamp và counter
+        timestamp = int(time.time() * 1000)  # Milliseconds since epoch
+        unique_id = timestamp + counter  # Kết hợp timestamp và counter
+        output_file_path = os.path.join(output_folder, f"{unique_id}.jpg")
+
+        # Lưu khuôn mặt đã crop vào file
+        cv2.imwrite(output_file_path, cropped_face)
+
+        print(f"Đã lưu khuôn mặt vào: {output_file_path}")
+
+        # Tăng counter để đảm bảo tính duy nhất
+        counter += 1
+    except Exception as e:
+        print(f"Lỗi khi xử lý khuôn mặt: {e}")
+
+print("Hoàn thành việc phát hiện và cắt khuôn mặt.")

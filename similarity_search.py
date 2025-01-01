@@ -29,7 +29,7 @@ except Exception as e:
 ibed = imgbeddings()
 
 # 3. Tính embedding cho ảnh mới
-new_img_path = "solo4.png"
+new_img_path = "0.jpg"
 try:
     new_img = Image.open(new_img_path)
     new_embedding = ibed.to_embeddings(new_img)[0]

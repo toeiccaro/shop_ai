@@ -1,15 +1,17 @@
 import os
-import numpy as np
-from imgbeddings import imgbeddings
-from PIL import Image
+from deepface import DeepFace
 import psycopg2
+import tensorflow as tf
+
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+print("Details:", tf.config.list_physical_devices('GPU'))
 
 # Kết nối tới cơ sở dữ liệu PostgreSQL
 try:
     conn = psycopg2.connect(
         host="db.logologee.com",
-        port=5432,          # Nếu PostgreSQL chạy trên cổng mặc định
-        database="shop",
+        port=5555,
+        database="shop01",
         user="postgres",
         password="logologi"
     )
@@ -21,32 +23,43 @@ except Exception as e:
 # Tạo đối tượng cursor
 cur = conn.cursor()
 
-# Khởi tạo imgbeddings để tính toán embedding
-ibed = imgbeddings()
-
 # Duyệt qua các file ảnh trong thư mục stored-faces
 folder_path = "stored-faces"
 for filename in os.listdir(folder_path):
     file_path = os.path.join(folder_path, filename)
 
-    # Chỉ xử lý nếu là file (tránh xử lý folder khác)
     if os.path.isfile(file_path):
         try:
-            # Đọc ảnh
-            img = Image.open(file_path)
+            # Kiểm tra xem imagepath đã tồn tại hay chưa
+            cur.execute("SELECT COUNT(*) FROM users WHERE imagepath = %s", (filename,))
+            count = cur.fetchone()[0]
 
-            # Tính toán embedding
-            embedding = ibed.to_embeddings(img)[0]  # ibed.to_embeddings() trả về mảng, lấy phần tử đầu
+            if count > 0:
+                print(f"Ảnh {filename} đã tồn tại trong cơ sở dữ liệu. Bỏ qua.")
+                continue  # Bỏ qua nếu ảnh đã tồn tại
 
-            # Chèn dữ liệu vào bảng pictures
+            # Tính toán embedding bằng ArcFace
+            result = DeepFace.represent(img_path=file_path, model_name="ArcFace", enforce_detection=True)
+            embedding = result[0]["embedding"]
+
+            # Chèn dữ liệu vào bảng users
             cur.execute(
-                "INSERT INTO pictures (picture, embedding) VALUES (%s, %s)",
-                (filename, embedding.tolist())
+                """
+                INSERT INTO users (useridpos, imagepath, imgbedding) 
+                VALUES (%s, %s, %s)
+                """,
+                (None, filename, embedding)
             )
 
             print(f"Đã ghi embedding cho file: {filename}")
+        except ValueError as ve:
+            # Bỏ qua ảnh không có khuôn mặt
+            print(f"Bỏ qua file {filename}: Không phát hiện được khuôn mặt.")
+            continue
         except Exception as e:
             print(f"Lỗi khi xử lý ảnh {filename}: {e}")
+            conn.rollback()  # Rollback giao dịch nếu có lỗi
+            continue          # Tiếp tục với ảnh tiếp theo
 
 # Lưu thay đổi
 conn.commit()

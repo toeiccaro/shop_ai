@@ -20,6 +20,7 @@ Thumbs.db
 # (Tuỳ chọn) Bỏ qua file cấu hình riêng, môi trường
 .env
 
+
 # (Tuỳ chọn) Nếu bạn không muốn đưa ảnh lên Git,
 # thêm các dòng sau. Ngược lại, nếu cần lưu ảnh, hãy xoá chúng:
 # *.png
@@ -27,4 +28,6 @@ Thumbs.db
 # *.jpg
 
 # (Tuỳ chọn) Nếu bạn không muốn commit thư mục stored-faces:
-# stored-faces/
+stored-faces/
+shop_env_03/
+

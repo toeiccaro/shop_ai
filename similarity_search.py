@@ -3,13 +3,13 @@ import psycopg2
 from PIL import Image
 from imgbeddings import imgbeddings
 
-from deepface import DeepFace
+# from deepface import DeepFace
 
-try:
-    analysis = DeepFace.analyze(img_path="solo4.png", actions=["gender"])
-    print("Đây là ảnh khuôn mặt người:", analysis)
-except ValueError:
-    print("Không phát hiện khuôn mặt trong ảnh. Dừng xử lý.")
+# try:
+#     analysis = DeepFace.analyze(img_path="solo4.png", actions=["gender"])
+#     print("Đây là ảnh khuôn mặt người:", analysis)
+# except ValueError:
+#     print("Không phát hiện khuôn mặt trong ảnh. Dừng xử lý.")
 
 # 1. Kết nối tới PostgreSQL
 try:
@@ -46,13 +46,7 @@ cur = conn.cursor()
 embedding_str = "[" + ",".join(str(x) for x in new_embedding.tolist()) + "]"
 
 # Lấy thêm cột 'distance' = (embedding <-> %s)
-query = """
-    SELECT picture,
-           embedding <=> %s AS distance
-    FROM pictures
-    ORDER BY distance
-    LIMIT 1;
-"""
+query = "SELECT picture, embedding <=> %s AS distance FROM pictures ORDER BY distance LIMIT 1;"
 cur.execute(query, (embedding_str,))
 rows = cur.fetchall()
 

@@ -1,24 +1,18 @@
 import os
 import psycopg2
-import detect.face_recognition_main as face_recognition_main
 from PIL import Image
+from deepface import DeepFace
 
-# 1. Kiểm tra khuôn mặt trong ảnh và tính embedding
-new_img_path = "solo4.png"
+# Tắt cảnh báo không cần thiết từ TensorFlow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''   # Chỉ sử dụng CPU
+
+# 1. Kiểm tra khuôn mặt trong ảnh và tính embedding bằng DeepFace
+new_img_path = "solo3.png"
 try:
-    # Load ảnh và phát hiện khuôn mặt
-    image = face_recognition_main.load_image_file(new_img_path)
-    face_locations = face_recognition_main.face_locations(image)
-
-    if len(face_locations) == 0:
-        print("Không phát hiện khuôn mặt trong ảnh. Dừng xử lý.")
-        exit(1)
-
-    # Tính embedding cho khuôn mặt
-    encodings = face_recognition_main.face_encodings(image, face_locations)
-    new_embedding = encodings[0]  # Lấy khuôn mặt đầu tiên (nếu có nhiều khuôn mặt)
+    result = DeepFace.represent(img_path=new_img_path, model_name="VGG-Face", enforce_detection=True)
+    new_embedding = result[0]["embedding"]
     print(f"Đã tính embedding cho ảnh: {new_img_path}")
-
 except Exception as e:
     print(f"Lỗi khi xử lý ảnh {new_img_path}: {e}")
     exit(1)
@@ -75,14 +69,31 @@ if rows:
     if distance > dist_threshold:
         print(f"Không tồn tại trong cơ sở dữ liệu (distance > {dist_threshold}).")
     else:
-        if os.path.isfile(similar_img_path):
-            print(f"Ảnh tương tự nhất (chấp nhận): {similar_img_path}")
-        else:
-            print(f"Không tìm thấy file trên disk: {similar_img_path}")
+        try:
+            if os.path.isfile(similar_img_path):
+                print(f"Ảnh tương tự nhất (chấp nhận): {similar_img_path}")
+
+                # So sánh chính xác hơn bằng DeepFace
+                try:
+                    verify_result = DeepFace.verify(img1_path=new_img_path, img2_path=similar_img_path, model_name="VGG-Face")
+                    if verify_result["verified"]:
+                        print(f"Hai khuôn mặt giống nhau! Độ tương đồng: {verify_result['distance']}")
+                    else:
+                        print(f"Hai khuôn mặt KHÔNG giống nhau! Độ tương đồng: {verify_result['distance']}")
+                except Exception as e:
+                    print(f"Lỗi khi sử dụng DeepFace để so sánh: {e}")
+
+            else:
+                print(f"Không tìm thấy file trên disk: {similar_img_path}")
+        except Exception as e:
+            print(f"Lỗi khi kiểm tra file trên disk: {e}")
 else:
     print("Không tìm thấy ảnh tương tự trong cơ sở dữ liệu.")
 
 # Đóng cursor & kết nối
-cur.close()
-conn.close()
-print("Đã đóng kết nối tới cơ sở dữ liệu.")
+try:
+    cur.close()
+    conn.close()
+    print("Đã đóng kết nối tới cơ sở dữ liệu.")
+except Exception as e:
+    print(f"Lỗi khi đóng kết nối cơ sở dữ liệu: {e}")

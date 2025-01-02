@@ -1,11 +1,21 @@
-from http.client import HTTPException
 import os
 import base64
 import time
 from PIL import Image
 from io import BytesIO
 import psycopg2
-from src.services.postgres_service import PostgresConnectionSingleton
+
+# Kết nối đến cơ sở dữ liệu PostgreSQL
+conn = psycopg2.connect(
+    host="db.logologee.com",
+    port=5555,
+    database="shop01",
+    user="postgres",
+    password="logologi"
+)
+print("Kết nối thành công tới PostgreSQL")
+
+# Hàm để dọn dẹp thư mục hình ảnh
 def clean_image_folder(directory):
     for filename in os.listdir(directory):
         file_path = os.path.join(directory, filename)
@@ -16,6 +26,7 @@ def clean_image_folder(directory):
         except Exception as e:
             print(f"Failed to delete {file_path}: {e}")
 
+# Hàm chuyển đổi base64 thành ảnh
 def save_base64_as_image(base64_string):
     try:
         # Remove the data URI prefix if it exists
@@ -39,8 +50,6 @@ def save_base64_as_image(base64_string):
 # Lưu ảnh và embedding vào cơ sở dữ liệu
 def save_user(userIdPos, image_base64, deepface_instance, db_instance):
     try:
-        if not PostgresConnectionSingleton.test_db_connection(db_instance):
-            raise HTTPException(status_code=500, detail="Database connection failed")
         # Clean up the images folder before saving a new image
         directory = "tempt/images_before_save"
         if not os.path.exists(directory):
@@ -73,38 +82,45 @@ def save_user(userIdPos, image_base64, deepface_instance, db_instance):
         if not embedding:
             return {"error": "Failed to process image"}
     except Exception as e:
+        print(f"Error during embedding calculation: {e}")
         return {"error": f"Lỗi khi tính toán embedding: {e}"}
 
-    # Lưu vào database
+    # Kiểm tra nếu userIdPos đã tồn tại trong cơ sở dữ liệu
     try:
-        # Check if the userIdPos already exists in the database
         print("before check exist")
-        query_check = """
-            SELECT COUNT(*) FROM users WHERE useridpos = %s::text
-        """
-        print("___exist")
-        # db_instance.execute_query(query_check, (userIdPos,))
-        # result = db_instance.fetch_one()
-        # print(f"Query result: {result}")
+        query_check = "SELECT COUNT(*) FROM users WHERE useridpos = %s"
+        print(f"Executing query: {query_check} with params: ({str(userIdPos)},)")
 
-        # print("after check exist")
-        # # If the userIdPos exists, skip insertion
-        # if result and result[0] > 0:
-        #     return {"error": "User already exists in the database"}
+        with conn.cursor() as cur:  # Use context manager for cursor
+            cur.execute(query_check, (str(userIdPos),))  # Chuyển đổi userIdPos thành chuỗi
+            result = cur.fetchone()
         
-        # If the userIdPos doesn't exist, insert new data
+        if result:
+            count = result[0]
+            print(f"Query-result: {count}")
+        else:
+            print("No result returned.")
+            count = 0
+
+        # Nếu userIdPos đã tồn tại, bỏ qua
+        if count > 0:
+            print(f"Ảnh đã tồn tại trong cơ sở dữ liệu. Bỏ qua.")
+            return {"message": "User already exists in the database"}  # Bỏ qua nếu ảnh đã tồn tại
+
+        # Nếu userIdPos không tồn tại, thêm mới vào cơ sở dữ liệu
         query_insert = """
             INSERT INTO users (useridpos, imagepath, imgbedding)
             VALUES (%s, %s, %s)
         """
         embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
-        db_instance.get_instance().execute_query(
-        """
-        INSERT INTO users (useridpos, imagepath, imgbedding) 
-        VALUES (%s, %s, %s)
-        """,
-        (None, image_path, embedding_str)
-            )
+        
+        with conn.cursor() as cur:  # Use context manager for cursor
+            cur.execute(query_insert, (str(userIdPos), image_path, embedding_str))  # Chuyển đổi userIdPos thành chuỗi
+            conn.commit()  # Đảm bảo commit để lưu thay đổi vào cơ sở dữ liệu
+            print(f"Đã ghi embedding cho ảnh: {image_path}")
+        
         return {"message": "User saved successfully", "userIdPos": userIdPos}
+    
     except Exception as e:
+        print(f"Error while saving data: {e}")
         return {"error": f"Lỗi khi lưu dữ liệu vào cơ sở dữ liệu: {e}"}

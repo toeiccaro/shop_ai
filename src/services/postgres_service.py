@@ -29,7 +29,9 @@ class PostgresConnectionSingleton:
         try:
             with PostgresConnectionSingleton._conn.cursor() as cur:  # Use context manager for cursor
                 cur.execute(query, params)
-                return cur.fetchall()  # Return only the query result
+                result = cur.fetchall()
+                print("result", result)
+                return result  # Return only the query result
         except Exception as e:
             print(f"Lỗi khi truy vấn cơ sở dữ liệu: {e}")
             return None
@@ -45,14 +47,15 @@ class PostgresConnectionSingleton:
     def test_db_connection(db_instance):
         try:
             # Thực hiện một truy vấn đơn giản để kiểm tra kết nối
-            query = "SELECT 1"
+            query = "SELECT * FROM users"
             result = db_instance.execute_query(query, ())  # Không cần tham số vì query chỉ kiểm tra kết nối
-            if result:
-                print("Kết nối cơ sở dữ liệu thành công!")
-                return True
-            else:
-                print("Kết nối cơ sở dữ liệu không thành công.")
-                return False
+            # if result:
+            #     print("Kết nối cơ sở dữ liệu thành công!")
+            #     return True
+            # else:
+            #     print("Kết nối cơ sở dữ liệu không thành công.")
+            #     return False
+            return result
         except Exception as e:
             print(f"Lỗi khi kiểm tra kết nối cơ sở dữ liệu: {e}")
             return False

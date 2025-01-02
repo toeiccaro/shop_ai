@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import base64
 import time
@@ -49,12 +50,36 @@ def save_base64_as_image(base64_string):
 
 # Lưu ảnh và embedding vào cơ sở dữ liệu
 def save_user(userIdPos, image_base64, deepface_instance, db_instance):
+ 
+    try:
+        print("before check exist")
+        query_check = "SELECT COUNT(*) FROM users WHERE useridpos = %s"
+        print(f"Executing query: {query_check} with params: ({str(userIdPos)},)")
+
+        with conn.cursor() as cur:  # Use context manager for cursor
+            cur.execute(query_check, (str(userIdPos),))  # Chuyển đổi userIdPos thành chuỗi
+            result = cur.fetchone()
+        
+        if result:
+            count = result[0]
+            print(f"Query-result: {count}")
+        else:
+            print("No result returned.")
+            count = 0
+
+        # Nếu userIdPos đã tồn tại, bỏ qua
+        if count > 0:
+            print(f"Ảnh đã tồn tại trong cơ sở dữ liệu. Bỏ qua.")
+            return {"message": "User already exists in the database"}  # Bỏ qua nếu ảnh đã tồn tại    
+    except Exception as e:
+            return {"error": f"Error when check exist: {e}"}
     try:
         # Clean up the images folder before saving a new image
-        directory = "tempt/images_before_save"
+        today = datetime.today().strftime('%Y-%m-%d')  # Get today's date in YYYY-MM-DD format
+        directory = os.path.join("src/images", today)  # Path with today's date
+
         if not os.path.exists(directory):
-            os.makedirs(directory)
-        clean_image_folder(directory)  # Clean the folder
+            os.makedirs(directory)  # Create the directory if it doesn't exist
 
         # Save the base64 image as a PIL Image object
         img = save_base64_as_image(image_base64)
@@ -86,27 +111,8 @@ def save_user(userIdPos, image_base64, deepface_instance, db_instance):
         return {"error": f"Lỗi khi tính toán embedding: {e}"}
 
     # Kiểm tra nếu userIdPos đã tồn tại trong cơ sở dữ liệu
+
     try:
-        print("before check exist")
-        query_check = "SELECT COUNT(*) FROM users WHERE useridpos = %s"
-        print(f"Executing query: {query_check} with params: ({str(userIdPos)},)")
-
-        with conn.cursor() as cur:  # Use context manager for cursor
-            cur.execute(query_check, (str(userIdPos),))  # Chuyển đổi userIdPos thành chuỗi
-            result = cur.fetchone()
-        
-        if result:
-            count = result[0]
-            print(f"Query-result: {count}")
-        else:
-            print("No result returned.")
-            count = 0
-
-        # Nếu userIdPos đã tồn tại, bỏ qua
-        if count > 0:
-            print(f"Ảnh đã tồn tại trong cơ sở dữ liệu. Bỏ qua.")
-            return {"message": "User already exists in the database"}  # Bỏ qua nếu ảnh đã tồn tại
-
         # Nếu userIdPos không tồn tại, thêm mới vào cơ sở dữ liệu
         query_insert = """
             INSERT INTO users (useridpos, imagepath, imgbedding)

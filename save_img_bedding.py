@@ -24,7 +24,7 @@ except Exception as e:
 cur = conn.cursor()
 
 # Duyệt qua các file ảnh trong thư mục stored-faces
-folder_path = "stored-faces"
+folder_path = "stored-faces2"
 for filename in os.listdir(folder_path):
     file_path = os.path.join(folder_path, filename)
 

@@ -29,5 +29,5 @@ Thumbs.db
 
 # (Tuỳ chọn) Nếu bạn không muốn commit thư mục stored-faces:
 stored-faces/
-shop_env_03/
+shopenv/
 

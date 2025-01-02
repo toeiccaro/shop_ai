@@ -84,6 +84,13 @@ async def stream_cam(background_tasks: BackgroundTasks):
                 except Exception as e:
                     print(f"Error while calling external API: {e}")
 
+            # Nếu userIdPos là None, chỉ trả về ảnh
+            if response["userIdPos"] is None:
+                return {"image": response["image"]}
+            else:
+                # Nếu userIdPos có giá trị, trả về cả userIdPos và image
+                return {"userIdPos": response["userIdPos"], "image": response["image"]}
+
             await asyncio.sleep(5)  # Chờ 5 giây trước khi gửi lại
 
     # Chạy task bất đồng bộ trong nền

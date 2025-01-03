@@ -1,15 +1,16 @@
 import asyncio
 import base64
-from datetime import time
+from datetime import datetime
+import time
 import os
 import random
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-from src.api.save_img_bedding import save_user
+from src.api.stream_cam import check_user_exists_by_embedding
+from src.api.face_detection import compute_embedding, detect_faces_and_save, read_frame_from_video
+from src.api.save_img_bedding import clean_image_folder, save_user
 import uvicorn
 from src.services.init_singletons import init_singletons  # Import the init_singletons function
-from src.api.stream_cam import process_and_compare_faces
-import cv2
 import httpx
 
 app = FastAPI()
@@ -42,54 +43,112 @@ async def save_user_api(request: SaveUserRequest, deepface_instance=Depends(lamb
 
     return response
 
-
 def generate_mock_response():
-    # Randomly choose userIdPos to be 1 or None
-    userIdPos = random.choice([1, None])  # Randomly select between 1 and None
+    num_items = random.randint(4, 5)  # Random số lượng phần tử trong mảng
+    mock_data = []
     
-    image_path = "src/images/2025-01-02/1735829794.jpeg"  # Đường dẫn tới ảnh
-    with open(image_path, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+    for _ in range(num_items):
+        userIdPos = random.choice([1, None])  # Randomly select between 1 and None
+        image_path = "src/images/2025-01-02/1735829794.jpeg"  # Đường dẫn tới ảnh
+        with open(image_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+        
+        mock_data.append({
+            "userIdPos": userIdPos,
+            "image": f"data:image/jpeg;base64,{encoded_image}"
+        })
     
-    response = {
-        "userIdPos": str(userIdPos),
-        "image": f"data:image/jpeg;base64,{encoded_image}"
-    }
-    return response
+    return mock_data
+
+# Tách phần gọi API ra thành một hàm riêng
+async def call_external_api(response_item):
+    try:
+        async with httpx.AsyncClient() as client:
+            payload = {
+                "userIdPos": response_item["userIdPos"],
+                "image": response_item["image"]
+            }
+
+            api_url = "https://pos.tanika.ai/api/user-info"
+            api_response = await client.post(api_url, json=payload)
+
+            # In ra kết quả từ API bên ngoài
+            print(f"API response: {api_response.status_code} - {api_response.json()}")
+    except Exception as e:
+        print(f"Error while calling external API: {e}")
+
+@app.post("/process-video")
+async def process_video(video_path: str, deepface_instance=Depends(lambda: app.state.deepface_instance)):
+    """
+    API nhận video và xử lý khuôn mặt trong video.
+    """
+    try:
+        frames = read_frame_from_video(video_path)  # Đọc các frame từ video
+        result_array = []
+
+        for frame in frames:
+            try:
+                print("call2")
+                # Tạo thư mục tạm thời cho từng frame
+                timestamp = str(int(time.time()))
+                output_folder = f"tempt/images_stream/{timestamp}"
+                os.makedirs(output_folder, exist_ok=True)
+
+                # Phát hiện khuôn mặt và lưu vào thư mục
+                face_paths = detect_faces_and_save(frame, output_folder)
+                print("call3", face_paths)
+                for face_path in face_paths:
+                    print("call3.5")
+                    embedding = compute_embedding(face_path)
+                    print("call4")
+                    if not embedding:
+                        continue
+                    print("call5")
+                    # Chuyển ảnh thành base64
+                    userIdPos = None
+                    user_exists = check_user_exists_by_embedding(embedding, face_path, deepface_instance)  # Check with DB
+                    if user_exists:
+                        userIdPos = user_exists
+
+                    # Chuyển ảnh thành base64
+                    with open(face_path, "rb") as image_file:
+                        encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+                    result_array.append({
+                        "userIdPos": userIdPos,  # Return userIdPos if found, else None
+                        "Image": f"data:image/jpeg;base64,{encoded_image}"
+                    })
+                    print("result_array=", result_array)
+
+                # Xóa thư mục tạm sau khi xử lý
+                clean_image_folder(output_folder)
+            except Exception as e:
+                # Nếu có lỗi với frame này, log lỗi và tiếp tục với frame tiếp theo
+                print(f"Error processing frame: {e}")
+                continue  # Tiếp tục với frame tiếp theo
+        print("result_array", result_array)           
+        return {"result": result_array}
+    
+    except Exception as e:
+        print(f"Error while processing video: {e}")
+        raise HTTPException(status_code=500, detail="Error while processing video")
 
 @app.post("/stream-cam")
 async def stream_cam(background_tasks: BackgroundTasks):
     """
-    API trả về response mock mỗi 5 giây và gửi request tới API bên ngoài.
+    API trả về response từ /process-video mỗi 5 giây và gửi request tới API bên ngoài cho mỗi phần tử.
     """
     async def process_and_return_response():
         while True:
-            response = generate_mock_response()
-            print("Generated mock response:", response)  # Log ra terminal
+            # Call /process-video API (with video stream URL or path)
+            video_url = "http://localhost:8000/export_camera"  # Thay thế URL video của bạn
+            mock_response = await process_video(video_url)  # Giả lập nhận video và xử lý khuôn mặt
 
-            # Gửi POST request tới API https://pos.tanika.ai/api/user-info
-            async with httpx.AsyncClient() as client:
-                try:
-                    payload = {
-                        "userIdPos": response["userIdPos"],
-                        "image": response["image"]
-                    }
-
-                    api_url = "https://pos.tanika.ai/api/user-info"
-                    api_response = await client.post(api_url, json=payload)
-
-                    # In ra kết quả từ API bên ngoài
-                    print(f"API response: {api_response.status_code} - {api_response.json()}")
-
-                except Exception as e:
-                    print(f"Error while calling external API: {e}")
-
-            # Nếu userIdPos là None, chỉ trả về ảnh
-            if response["userIdPos"] is None:
-                return {"image": response["image"]}
-            else:
-                # Nếu userIdPos có giá trị, trả về cả userIdPos và image
-                return {"userIdPos": response["userIdPos"], "image": response["image"]}
+            print("Generated mock response:", mock_response)
+            
+            # Duyệt qua các phần tử trong mock response và gọi API cho từng phần tử
+            for response_item in mock_response["result"]:
+                await call_external_api(response_item)
 
             await asyncio.sleep(5)  # Chờ 5 giây trước khi gửi lại
 

@@ -5,6 +5,7 @@ import time
 from PIL import Image
 from io import BytesIO
 import psycopg2
+import shutil
 
 # Kết nối đến cơ sở dữ liệu PostgreSQL
 conn = psycopg2.connect(
@@ -24,6 +25,7 @@ def clean_image_folder(directory):
             if os.path.isfile(file_path):
                 os.remove(file_path)
                 print(f"Deleted file: {file_path}")
+            shutil.rmtree(directory)
         except Exception as e:
             print(f"Failed to delete {file_path}: {e}")
 

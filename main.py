@@ -141,7 +141,7 @@ async def stream_cam(background_tasks: BackgroundTasks):
     async def process_and_return_response():
         while True:
             # Call /process-video API (with video stream URL or path)
-            video_url = "http://localhost:8000/export_camera"  # Thay thế URL video của bạn
+            video_url = "https://abcd1234.ngrok.io/export_camera"  # Thay thế URL video của bạn
             mock_response = await process_video(video_url)  # Giả lập nhận video và xử lý khuôn mặt
 
             print("Generated mock response:", mock_response)

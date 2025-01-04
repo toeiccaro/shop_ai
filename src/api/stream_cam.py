@@ -19,7 +19,7 @@ def check_user_exists_by_embedding(embedding, image_path, deepface_instance):
 
         # Tìm kiếm các embeddings trong cơ sở dữ liệu với khoảng cách nhỏ hơn ngưỡng 0.6
         query = """
-            SELECT imagepath,
+            SELECT userIdPos, imagepath,
                    imgbedding <-> %s::vector AS distance
             FROM users
             ORDER BY distance
@@ -32,17 +32,17 @@ def check_user_exists_by_embedding(embedding, image_path, deepface_instance):
         print("rowsrowsrows=", rows)
         if rows:
             for row in rows:
-                userIdPos, stored_image_path = row
-                print(f"Phát hiện userIdPos: {userIdPos}, imagepath: {stored_image_path}")
+                userIdPos, imagepath, distance = row
+                print(f"Phát hiện userIdPos: {userIdPos}, imagepath: {imagepath}")
                 print("image_pathimage_path1=", image_path)
-                print("image_pathimage_path2=", image_path)
+                print("image_pathimage_path2=", imagepath)
 
                 # Sử dụng DeepFace để xác minh khuôn mặt
-                verify_result = deepface_instance.verify_images(img1_path=image_path, img2_path=stored_image_path)
+                verify_result = deepface_instance.verify_images(img1_path=image_path, img2_path=imagepath)
                 print("verify_resultverify_result=", verify_result)
                 # Nếu khoảng cách nhỏ hơn ngưỡng 0.6, là trùng khớp
                 if verify_result and verify_result['distance'] < 0.6:
-                    print(f"Xác minh thành công: Ảnh {stored_image_path} trùng khớp với khoảng cách {verify_result['distance']}")
+                    print(f"Xác minh thành công: Ảnh {imagepath} trùng khớp với khoảng cách {verify_result['distance']}")
                     return userIdPos  # Trả về userIdPos nếu khuôn mặt trùng khớp
                 else:
                     print(f"Xác minh thất bại: Khoảng cách {verify_result['distance']} vượt quá ngưỡng")

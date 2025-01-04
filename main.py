@@ -1,6 +1,7 @@
 import asyncio
 import base64
 from datetime import datetime
+import shutil
 import time
 import os
 import random
@@ -133,28 +134,57 @@ async def process_video(video_path: str, deepface_instance=Depends(lambda: app.s
         print(f"Error while processing video: {e}")
         raise HTTPException(status_code=500, detail="Error while processing video")
 
-@app.post("/stream-cam")
-async def stream_cam(background_tasks: BackgroundTasks):
+@app.post("/process-frame")
+async def process_frame(payload: dict, deepface_instance=Depends(lambda: app.state.deepface_instance)):
     """
-    API trả về response từ /process-video mỗi 5 giây và gửi request tới API bên ngoài cho mỗi phần tử.
+    API này nhận frame từ API 1 và xử lý khuôn mặt.
     """
-    async def process_and_return_response():
-        while True:
-            # Call /process-video API (with video stream URL or path)
-            video_url = "https://abcd1234.ngrok.io/export_camera"  # Thay thế URL video của bạn
-            mock_response = await process_video(video_url)  # Giả lập nhận video và xử lý khuôn mặt
+    try:
+        # Chuyển frame từ base64 về ảnh
+        frame_data = base64.b64decode(payload["frame"])
+        timestamp = str(int(time.time()))
+        output_folder = f"tempt/images_stream/{timestamp}"
+        os.makedirs(output_folder, exist_ok=True)
 
-            print("Generated mock response:", mock_response)
+        # Đường dẫn tới file ảnh (root.jpg)
+        output_image_path = os.path.join(output_folder, "root.jpg")
+        with open(output_image_path, "wb") as f:
+            f.write(frame_data)
+        # Phát hiện khuôn mặt và lưu vào thư mục
+        face_paths = detect_faces_and_save(frame_data, output_folder)
+
+        result_array = []
+        for face_path in face_paths:
+            embedding = compute_embedding(face_path)
+            if not embedding:
+                continue
             
-            # Duyệt qua các phần tử trong mock response và gọi API cho từng phần tử
-            for response_item in mock_response["result"]:
-                await call_external_api(response_item)
+            print("call5")
+            # Chuyển ảnh thành base64
+            userIdPos = None
+            user_exists = check_user_exists_by_embedding(embedding, face_path, deepface_instance)  # Check with DB
+            if user_exists:
+                userIdPos = user_exists
+                # Chuyển ảnh thành base64
+            with open(face_path, "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+                    
+            result_array.append({
+                "userIdPos": userIdPos,  # Return userIdPos if found, else None
+                "Image": f"data:image/jpeg;base64,{encoded_image}"
+            })
+            print("result_array=", result_array)
+        # Xóa thư mục tạm sau khi xử lý
+        for response_item in result_array:
+            await call_external_api(response_item)  # Gọi API ngoài để xử lý mỗi phần tử trong kết quả
+        
+        clean_image_folder(output_folder)
 
-            await asyncio.sleep(5)  # Chờ 5 giây trước khi gửi lại
+        return {"result": result_array}
 
-    # Chạy task bất đồng bộ trong nền
-    background_tasks.add_task(process_and_return_response)
-    return {"message": "Started processing camera stream"}
+    except Exception as e:
+        print(f"Error while processing frame: {e}")
+        raise HTTPException(status_code=500, detail="Error while processing frame")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001, reload=True)

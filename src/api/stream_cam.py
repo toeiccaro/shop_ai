@@ -34,10 +34,12 @@ def check_user_exists_by_embedding(embedding, image_path, deepface_instance):
             for row in rows:
                 userIdPos, stored_image_path = row
                 print(f"Phát hiện userIdPos: {userIdPos}, imagepath: {stored_image_path}")
+                print("image_pathimage_path1=", image_path)
+                print("image_pathimage_path2=", image_path)
 
                 # Sử dụng DeepFace để xác minh khuôn mặt
                 verify_result = deepface_instance.verify_images(img1_path=image_path, img2_path=stored_image_path)
-                
+                print("verify_resultverify_result=", verify_result)
                 # Nếu khoảng cách nhỏ hơn ngưỡng 0.6, là trùng khớp
                 if verify_result and verify_result['distance'] < 0.6:
                     print(f"Xác minh thành công: Ảnh {stored_image_path} trùng khớp với khoảng cách {verify_result['distance']}")

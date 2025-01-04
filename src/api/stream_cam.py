@@ -28,6 +28,8 @@ def check_user_exists_by_embedding(embedding, image_path, deepface_instance):
 
         if result:
             userIdPos, stored_image_path = result
+            print("userIdPos", userIdPos)
+            print("stored_image_path", stored_image_path)
             # Verify the match using DeepFace's ArcFace model
             verify_result = deepface_instance.verify_images(img1_path=image_path, img2_path=stored_image_path)
             

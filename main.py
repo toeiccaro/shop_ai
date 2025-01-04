@@ -159,7 +159,7 @@ async def process_frame(payload: dict, deepface_instance=Depends(lambda: app.sta
             if not embedding:
                 continue
             
-            print("call5")
+            print("face_pathface_path=", face_path)
             # Chuyển ảnh thành base64
             userIdPos = None
             user_exists = check_user_exists_by_embedding(embedding, face_path, deepface_instance)  # Check with DB
@@ -171,14 +171,14 @@ async def process_frame(payload: dict, deepface_instance=Depends(lambda: app.sta
                     
             result_array.append({
                 "userIdPos": userIdPos,  # Return userIdPos if found, else None
-                "Image": f"data:image/jpeg;base64,{encoded_image}"
+                "image": f"data:image/jpeg;base64,{encoded_image}"
             })
             print("result_array=", result_array)
         # Xóa thư mục tạm sau khi xử lý
         for response_item in result_array:
             await call_external_api(response_item)  # Gọi API ngoài để xử lý mỗi phần tử trong kết quả
         
-        clean_image_folder(output_folder)
+        # clean_image_folder(output_folder)
 
         return {"result": result_array}
 
